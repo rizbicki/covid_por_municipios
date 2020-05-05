@@ -1,0 +1,608 @@
+---
+title: "Covid-19: Evolução por município"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    logo: small48.png
+    favicon: small48.png
+    navbar:
+      - { icon: "fa-linkedin", href: "https://www.linkedin.com/in/rafaelizbicki/", align: right}
+      - { icon: "fa-github", href: "https://github.com/rizbicki", align: right}
+      - { icon: "fa-twitter", href: "https://www.twitter.com/rizbicki", align: right}
+      - { title: "Sobre mim", href: "http://www.rizbicki.ufscar.br/", align: right}
+runtime: shiny    
+---
+
+<style>    
+.section.sidebar {
+background-color: F8F8F8; 
+}
+
+.navbar {
+background-color:#003D79;
+border-color:white;
+}
+.navbar-brand {
+color:white!important;
+
+}
+</style>  
+
+<script>
+$('.navbar-logo').wrap('<a href="http://www.small.ufscar.br/">');
+</script>
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(tidyverse)
+library(scales)
+library(lubridate)
+library(patchwork)
+library(knitr)
+library(kableExtra)
+library(ftplottools)
+library(plotly)
+#library(geobr)
+library(brazilmaps)
+library(sf)
+#theme_set(theme_bw(base_size = 20))
+theme_set(ft_theme(base_size = 20))
+no_axis <- theme(axis.title=element_blank(),
+                 axis.text=element_blank(),
+                 axis.ticks=element_blank(),
+                 panel.grid.major = element_blank(),
+                 panel.grid.minor = element_blank())
+
+n_min_obitos <- 20
+
+br <- read_rds("br.RDS") # mapa municípios
+
+dados <- read_csv("cases-brazil-cities-time.csv")
+
+#dados <- dados %>% 
+#  filter(date<="2020-05-02")
+
+dados_estados <- dados %>% 
+  group_by(date,state) %>% 
+  summarise(newDeaths=sum(newDeaths),
+            deaths=sum(deaths),
+            newCases=sum(newCases),
+            totalCases=sum(totalCases))
+
+sem_loc <- dados$city[grep(pattern = "LOCAL",dados$city)]
+
+dados <- dados %>% 
+  arrange(date) %>% 
+  filter(date>"2020-03-15",city!="TOTAL",
+         !(city%in%sem_loc))
+
+dados_estados <- dados_estados %>% 
+  arrange(date) %>% 
+  filter(date>"2020-03-15",state!="TOTAL")
+
+dados_padronizado_cidade <- dados %>% 
+  filter(deaths>=20) %>% 
+  group_by(city) %>% 
+  mutate(dia_padronizado=row_number())
+
+dados_padronizado_estado <- dados_estados %>% 
+  filter(deaths>=20) %>% 
+  group_by(state) %>% 
+  mutate(dia_padronizado=row_number())
+
+dados_por_semana_cidade <- 
+  dados %>% 
+  mutate(semana=epiweek(date)) %>% 
+  group_by(semana,city) %>% 
+  summarise(newDeaths=sum(newDeaths),
+            newCases=sum(newCases),
+            deaths=max(deaths),
+            totalCases=max(totalCases))
+
+dados_por_semana_estado <- 
+  dados_estados %>% 
+  mutate(semana=epiweek(date)) %>% 
+  group_by(semana,state) %>% 
+  summarise(newDeaths=sum(newDeaths),
+            newCases=sum(newCases),
+            deaths=max(deaths),
+            totalCases=max(totalCases))
+
+total_casos <- dados %>% 
+  group_by(city) %>% 
+  summarise(total_casos=sum(newCases),
+            total_mortes=sum(newDeaths)) %>% 
+  filter(total_mortes>n_min_obitos)
+
+dados_cidade <- dados %>% 
+  filter(city%in%total_casos$city)
+
+ultima_atualizacao <- paste0(day(max(dados$date)),"/",month(max(dados$date)),"/",
+                             year(max(dados$date)))
+
+
+
+
+codigos <- tidyr::tribble(~codigo,	~uf_nome, ~sigla,
+                          11,	"Rondônia",	"RO",
+                          12,	"Acre",	    "AC",
+                          13,	"Amazonas",	"AM",
+                          14,	"Roraima",	"RR",
+                          15,	"Pará",	    "PA",
+                          16, "Amapá",	  "AP",
+                          17,	"Tocantins","TO",
+                          21,	"Maranhão",	"MA",
+                          22,	"Piauí",	  "PI",
+                          23,	"Ceará",  	"CE",
+                          24,	"Rio Grande do Norte",	"RN",
+                          25,	"Paraíba",   	"PB",
+                          26,	"Pernambuco", "PE",
+                          27,	"Alagoas",	  "AL",
+                          28,	"Sergipe",	  "SE",
+                          29,	"Bahia",	    "BA",
+                          31,	"Minas Gerais",	  "MG",
+                          32,	"Espírito Santo",	"ES",
+                          33,	"Rio de Janeiro",	"RJ",
+                          35,	"São Paulo",	    "SP",
+                          41,	"Paraná",	        "PR",
+                          42,	"Santa Catarina",	"SC",
+                          43,	"Rio Grande do Sul",	"RS",
+                          50,	"Mato Grosso do Sul",	"MS",
+                          51,	"Mato Grosso",	      "MT",
+                          52,	"Goiás",	            "GO",
+                          53,	"Distrito Federal",	  "DF")
+
+
+casos_ultimos_dias <- dados_cidade %>%
+  group_by(state,city,ibgeID) %>% 
+  filter(date%in%c(max(dados_cidade$date)-7,max(dados_cidade$date)))
+
+
+dados_mapa <- brazilmaps::get_brmap("City")
+```
+
+
+
+Row {.sidebar}
+=======================================================================
+
+```{r}
+radioButtons("escala",label = strong("Escala"),
+             choices = c("Linear","Logarítmica"))
+radioButtons("estat",label =strong("Estatística"),
+             choices = c("Casos","Óbitos"))
+radioButtons("localidade",label =strong("Localidade"),
+             choices = c("Municípios","Estados"))
+
+```
+
+
+
+```{r}
+conditionalPanel(
+  condition = "input.localidade == 'Municípios'",
+  selectInput("cidade", strong("Municípios:"), 
+              sort(unique(total_casos$city)),
+              selected = c("São Paulo/SP","Rio de Janeiro/RJ"), 
+              multiple = TRUE, selectize = TRUE)
+)
+conditionalPanel(
+  condition = "input.localidade == 'Estados'",
+  selectInput("state", strong("Estados:"), 
+              sort(unique(dados_estados$state)),
+              selected = c("SP","RJ"), 
+              multiple = TRUE, selectize = TRUE)
+)
+```
+
+
+
+### 
+
+**Última atualização** do banco de dados: `r ultima_atualizacao`.
+
+
+
+
+Análises
+=======================================================================
+
+Row {data-height=2000 .tabset .tabset-fade}
+-----------------------------------------------------------------------
+
+
+### Diário
+
+```{r}
+renderPlot({
+  
+  if(input$localidade == 'Estados')
+  {
+    dados <- dados_estados  %>% 
+      filter(state%in%input$state) %>% 
+      rename(localidade=state)
+  } else {
+    dados <- dados_cidade  %>% 
+      filter(city%in%input$cidade)%>% 
+      rename(localidade=city)
+  }
+  
+  
+  if(input$estat=="Óbitos")
+  {
+    
+    g1 <- ggplot(data=dados,
+                 aes(x=date,y=newDeaths,color=localidade))+
+      geom_line(size=2,alpha=0.6)+
+      geom_point(cex=4,alpha=0.6)+
+      theme(axis.text.x = element_text(size=18),
+            legend.title=element_blank())+
+      xlab("Dia")+
+      ylab("Novos Óbitos")+
+      scale_x_date(labels = date_format("%d/%m"))+
+      expand_limits(y = 0)
+    
+    g2 <- ggplot(data=dados,
+                 aes(x=date,y=deaths,color=localidade))+
+      geom_line(size=2,alpha=0.6)+
+      geom_point(cex=4,alpha=0.6)+
+      theme(axis.text.x = element_text(size=18),
+            legend.title=element_blank())+
+      xlab("Dia")+
+      ylab("Óbitos (acumulado)")+
+      scale_x_date(labels = date_format("%d/%m"))+
+      expand_limits(y = 0)
+    
+    
+  } else {
+    g1 <- ggplot(data=dados,
+                 aes(x=date,y=newCases,color=localidade))+
+      geom_line(size=2,alpha=0.6)+
+      geom_point(cex=4,alpha=0.6)+
+      theme(axis.text.x = element_text(size=18),
+            legend.title=element_blank())+
+      xlab("Dia")+
+      ylab("Novos Casos")+
+      scale_x_date(labels = date_format("%d/%m"))+
+      expand_limits(y = 0)
+    
+    g2 <- ggplot(data=dados,
+                 aes(x=date,y=totalCases,color=localidade))+
+      geom_line(size=2,alpha=0.6)+
+      geom_point(cex=4,alpha=0.6)+
+      theme(axis.text.x = element_text(size=18),
+            legend.title=element_blank())+
+      xlab("Dia")+
+      ylab("Casos (acumulado)")+
+      scale_x_date(labels = date_format("%d/%m"))+
+      expand_limits(y = 0)
+    
+  }
+  
+  
+  if(input$escala=="Logarítmica")
+  {
+    g1 <- g1+scale_y_log10()
+    g2 <- g2+scale_y_log10()
+  }
+  
+  g1/g2
+})
+```
+
+
+
+### Semanal
+
+**Atenção:** Os dados da última semana podem estar incompletos, pois ela pode não ter se encerrado.
+
+```{r}
+renderPlot({
+  if(input$localidade == 'Estados')
+  {
+    dados <- dados_por_semana_estado  %>% 
+      filter(state%in%input$state) %>% 
+      rename(localidade=state)
+  } else {
+    dados <- dados_por_semana_cidade  %>% 
+      filter(city%in%input$cidade)%>% 
+      rename(localidade=city)
+  }
+  
+  
+  if(input$estat=="Óbitos")
+  {
+    
+    g1 <- ggplot(data=dados,
+                 aes(x=semana,y=newDeaths,color=localidade))+
+      geom_line(size=2,alpha=0.6)+
+      geom_point(cex=4,alpha=0.6)+
+      theme(axis.text.x = element_text(size=18),
+            legend.title=element_blank())+
+      xlab("Semana epidemiológica")+
+      ylab("Novos Óbitos")+
+      expand_limits(y = 0)
+    
+    
+    g2 <- ggplot(data=dados,
+                 aes(x=semana,y=deaths,color=localidade))+
+      geom_line(size=2,alpha=0.6)+
+      geom_point(cex=4,alpha=0.6)+
+      theme(axis.text.x = element_text(size=18),
+            legend.title=element_blank())+
+      xlab("Semana epidemiológica")+
+      ylab("Óbitos (acumulado)")+
+      expand_limits(y = 0)
+    
+  } else {
+    g1 <- ggplot(data=dados,
+                 aes(x=semana,y=newCases,color=localidade))+
+      geom_line(size=2,alpha=0.6)+
+      geom_point(cex=4,alpha=0.6)+
+      theme(axis.text.x = element_text(size=18),
+            legend.title=element_blank())+
+      xlab("Semana epidemiológica")+
+      ylab("Novos Casos")+
+      expand_limits(y = 0)
+    
+    g2 <- ggplot(data=dados,
+                 aes(x=semana,y=totalCases,color=localidade))+
+      geom_line(size=2,alpha=0.6)+
+      geom_point(cex=4,alpha=0.6)+
+      theme(axis.text.x = element_text(size=18),
+            legend.title=element_blank())+
+      xlab("Semana epidemiológica")+
+      ylab("Casos (acumulado)")+
+      expand_limits(y = 0)
+  }
+  
+  
+  if(input$escala=="Logarítmica")
+  {
+    g1<- g1+
+      scale_y_log10()
+    
+    g2<- g2+
+      scale_y_log10()
+  }
+  
+  g1/g2
+  
+})
+```
+
+### Diário normalizado
+
+
+```{r}
+renderPlot({
+  
+  if(input$localidade == 'Estados')
+  {
+    dados <- dados_padronizado_estado  %>% 
+      filter(state%in%input$state) %>% 
+      rename(localidade=state)
+  } else {
+    dados <- dados_padronizado_cidade  %>% 
+      filter(city%in%input$cidade)%>% 
+      rename(localidade=city)
+  }
+  
+  
+  if(input$estat=="Óbitos")
+  {
+    
+    g1 <- ggplot(data=dados,
+                 aes(x=dia_padronizado,y=newDeaths,color=localidade))+
+      geom_line(size=2,alpha=0.6)+
+      geom_point(cex=4,alpha=0.6)+
+      theme(axis.text.x = element_text(size=18),
+            legend.title=element_blank())+
+      xlab("Dias desde o 20º óbito")+
+      ylab("Novos Óbitos")+
+      expand_limits(y = 0)
+    
+    g2 <- ggplot(data=dados,
+                 aes(x=dia_padronizado,y=deaths,color=localidade))+
+      geom_line(size=2,alpha=0.6)+
+      geom_point(cex=4,alpha=0.6)+
+      theme(axis.text.x = element_text(size=18),
+            legend.title=element_blank())+
+      xlab("Dias desde o 20º óbito")+
+      ylab("Óbitos (acumulado)")+
+      expand_limits(y = 0)
+    
+  } else {
+    g1 <- ggplot(data=dados,
+                 aes(x=dia_padronizado,y=newCases,color=localidade))+
+      geom_line(size=2,alpha=0.6)+
+      geom_point(cex=4,alpha=0.6)+
+      theme(axis.text.x = element_text(size=18),
+            legend.title=element_blank())+
+      xlab("Dias desde o 20º óbito")+
+      ylab("Novos Casos")+
+      expand_limits(y = 0)
+    
+    g2 <- ggplot(data=dados,
+                 aes(x=dia_padronizado,y=totalCases,
+                     color=localidade))+
+      geom_line(size=2,alpha=0.6)+
+      geom_point(cex=4,alpha=0.6)+
+      theme(axis.text.x = element_text(size=18),
+            legend.title=element_blank())+
+      xlab("Dias desde o 20º óbito")+
+      ylab("Casos (acumulado)")+
+      expand_limits(y = 0)
+  }
+  
+  
+  if(input$escala=="Logarítmica")
+  {
+    g1 <- g1+scale_y_log10()
+    g2 <- g2+scale_y_log10()
+  }
+  
+  g1/g2
+  
+  
+})
+```
+
+### Variação de óbitos 
+
+```{r}
+renderPlot({
+  
+  mortes_ultimos_dias <- dados_cidade %>%
+    group_by(city) %>% 
+    filter(date%in%c(max(dados_cidade$date)-7,max(dados_cidade$date))) %>% 
+    summarise(Aumento=(max(deaths)-min(deaths))/min(deaths))%>%
+    filter(Aumento!=Inf) %>% 
+    rename(Município=city)
+  
+  tab <- mortes_ultimos_dias %>% 
+    arrange(desc(Aumento))
+  
+  ggplot(tab)+
+    geom_col(aes(x=reorder(Município,-Aumento,function(x)-sum(x)),Aumento),fill="steelblue")+
+    scale_y_continuous(labels = scales::percent)+
+    coord_flip()+
+    ylab("Aumento percentual de óbitos nos últimos 7 dias")+
+    xlab("")
+  #tab$Aumento <- paste0(round(tab$Aumento*100,1),"%")
+  
+  #kable(tab) %>%
+  #  kable_styling(bootstrap_options = c("striped", 
+  #                                      "hover", "condensed", #"responsive"), full_width = F)
+})
+```
+
+
+### Variação de novos casos
+
+```{r}
+renderPlot({
+  
+  casos_ultimos_dias <- dados_cidade %>%
+    group_by(city) %>% 
+    filter(date%in%c(max(dados_cidade$date)-7,max(dados_cidade$date))) %>% 
+    summarise(Aumento=(max(totalCases)-min(totalCases))/min(totalCases))%>%
+    filter(Aumento!=Inf) %>% 
+    rename(Município=city)
+  
+  
+  tab <- casos_ultimos_dias %>% 
+    arrange(desc(Aumento)) 
+  
+  
+  ggplot(tab)+
+    geom_col(aes(x=reorder(Município,-Aumento,function(x)-sum(x)),Aumento),fill="steelblue")+
+    scale_y_continuous(labels = scales::percent)+
+    coord_flip()+
+    ylab("Aumento percentual de casos nos últimos 7 dias")+
+    xlab("")
+  
+  #tab$Aumento <- paste0(round(tab$Aumento*100,1),"%")
+  
+  #kable(tab) %>%
+  #  kable_styling(bootstrap_options = c("striped", 
+  #                                      "hover", "condensed", #"responsive"), full_width = F)
+})
+```
+
+
+### Mapa de espalhamento
+
+```{r}
+selectInput("state_map", strong("Estado:"), 
+            sort(unique(dados_estados$state)),
+            selected = c("SP"), 
+            multiple = FALSE, selectize = TRUE)
+```
+
+
+**Selecione a opção** *óbito* ou *casos*
+no menu da esquerda para alterar a estatística.
+
+```{r}
+renderPlotly({
+  
+  
+  if(input$estat=="Óbitos")
+  {
+    casos_ultimos_dias <- casos_ultimos_dias %>%
+      summarise(Aumento=(max(deaths)-min(deaths))/min(deaths))%>%
+      filter(Aumento!=Inf) %>% 
+      rename(Município=city)
+  } else {
+    casos_ultimos_dias <- casos_ultimos_dias %>%
+      summarise(Aumento=(max(totalCases)-min(totalCases))/min(totalCases))%>%
+      filter(Aumento!=Inf) %>% 
+      rename(Município=city)
+    
+  }
+  
+  dados_mapa <- dados_mapa %>% 
+    left_join(codigos, by = c("State" = "codigo")) %>% 
+    left_join(casos_ultimos_dias, by = c("City" = "ibgeID")) %>% 
+    filter(sigla == input$state_map) %>% 
+    mutate(Crescimento = round(100*Aumento, 1)) 
+  
+  dados_mapa$Município <- dados_mapa$nome
+  
+  mapa <- ggplot(dados_mapa) +
+    geom_sf(aes(geometry=geometry,key1 = Município),color= "grey",fill="lightgrey", size = .3)
+  
+  if(sum(!is.na(dados_mapa$Aumento)) > 1){
+    
+    mapa <- mapa +
+      geom_sf(data=dados_mapa[!is.na(dados_mapa$Aumento),],aes(key1 = Município, fill = Aumento), color= "grey", size = .3) +
+      scale_fill_fermenter(palette = "OrRd",name="",
+                           labels = percent,direction = 1) 
+    
+  }
+  
+  if(sum(!is.na(dados_mapa$Aumento)) == 1){
+    
+    mapa <- mapa +
+      geom_sf(aes(key1 = Município), color= "grey", size = .3, fill = "lightgrey") +
+      geom_sf(data = filter(dados_mapa, !is.na(Aumento)), color= "grey", fill = "red", size=.5) 
+  }
+  
+  if(sum(!is.na(dados_mapa$Aumento)) == 1){
+    
+    mapa <- mapa +
+      geom_sf(aes(key1 = Município), color= "grey", size = .3, fill = "lightgrey") 
+  }
+  
+  
+  #ggplotly(mapa, tooltip = c("key2", "key1")) 
+  mapa <- mapa+ 
+    theme_minimal() +
+    labs(title = paste0("Aumento percentual", input$estat," dos últimos 7 dias (apenas municípios com ao menos ", n_min_obitos, " óbitos")) + 
+    no_axis
+})
+```
+
+
+Explicações
+====================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### 
+
+A finalidade deste app é mostrar a evolução do novo coronavírus
+nos municípios em que há ao menos `r n_min_obitos` óbitos. Os dados utilizados  elabordar os gráficos 
+representam apenas casos confirmados para covid-19
+e foram obtidos em
+[https://github.com/wcota/covid19br/blob/master/cases-brazil-cities-time.csv](https://github.com/wcota/covid19br/blob/master/cases-brazil-cities-time.csv). 
+
+A **última atualização** do banco de dados utilizado para a construção destes gráficos foi feita em `r ultima_atualizacao`.
+
+
+**Atenção**: Lembre-se que as semanas epidemológicas se encerram aos sábados, de modo que os dados da última semana mostrada na aba "semanal"  podem estar incompletos.
+
+Para sugestões/críticas/erros, por favor me envie um email (que pode ser encontrado em [http://www.rizbicki.ufscar.br/](http://www.rizbicki.ufscar.br/)).

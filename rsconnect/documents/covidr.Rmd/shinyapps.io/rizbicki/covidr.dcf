@@ -1,0 +1,12 @@
+name: covidr
+title: covidr
+username:
+account: rizbicki
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2234486
+bundleId: 3097911
+url: https://rizbicki.shinyapps.io/covidr/
+when: 1588534210.8624
+asMultiple: FALSE
+asStatic: FALSE

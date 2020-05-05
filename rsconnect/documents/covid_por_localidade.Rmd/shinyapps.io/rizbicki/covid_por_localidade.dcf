@@ -1,0 +1,12 @@
+name: covid_por_localidade
+title: covid_por_localidade
+username:
+account: rizbicki
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2235316
+bundleId: 3103296
+url: https://rizbicki.shinyapps.io/covid_por_localidade/
+when: 1588626574.5903
+asMultiple: FALSE
+asStatic: FALSE

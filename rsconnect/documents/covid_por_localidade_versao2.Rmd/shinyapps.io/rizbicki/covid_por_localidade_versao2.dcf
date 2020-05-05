@@ -1,0 +1,13 @@
+name: covid_por_localidade_versao2
+title: covid_por_localidade_versao2
+username:
+account: rizbicki
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2240712
+bundleId: 3103165
+url: https://rizbicki.shinyapps.io/covid_por_localidade_versao2/
+when: 1588624772.16833
+asMultiple: TRUE
+asStatic: FALSE
+ignoredFiles: covid_por_localidade_versaoTiago.Rmd|covid_por_localidade.Rmd

@@ -1,0 +1,10 @@
+name: sp_covid
+title:
+username:
+account: rizbicki
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2233958
+bundleId: 3097608
+url: https://rizbicki.shinyapps.io/sp_covid/
+when: 1588527174.96023

@@ -1,0 +1,12 @@
+name: covid_por_municipios
+title: covid_por_municipios
+username:
+account: rizbicki
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2233990
+bundleId: 3097629
+url: https://rizbicki.shinyapps.io/covid_por_municipios/
+when: 1588527692.61606
+asMultiple: FALSE
+asStatic: FALSE
