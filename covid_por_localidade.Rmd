@@ -1,5 +1,5 @@
 ---
-title: "Evolução da Covid-19 no Brasil - versão 5 óbitos"
+title: "Evolução da Covid-19 no Brasil"
 output: 
   flexdashboard::flex_dashboard:
     orientation: rows
@@ -7,9 +7,6 @@ output:
     logo: small48.png
     favicon: small48.png
     navbar:
-      - { icon: "fa-linkedin", href: "https://www.linkedin.com/in/rafaelizbicki/", align: right}
-      - { icon: "fa-github", href: "https://github.com/rizbicki", align: right}
-      - { icon: "fa-twitter", href: "https://www.twitter.com/rizbicki", align: right}
       - { title: "Sobre mim", href: "http://www.rizbicki.ufscar.br/", align: right}
 runtime: shiny    
 ---
@@ -49,6 +46,7 @@ library(sf)
 library(leaflet)
 library(htmltools)
 library(leafem)
+library(viridis)
 #theme_set(theme_bw(base_size = 20))
 theme_set(ft_theme(base_size = 20))
 no_axis <- theme(axis.title=element_blank(),
@@ -173,6 +171,15 @@ casos_ultimos_dias_estado <- dados_estados %>%
   group_by(state) %>% 
   filter(date%in%c(max(dados_estados$date)-8,max(dados_estados$date)-1))
 
+mapa_brasil <- brazilmaps::get_brmap("City")
+dados_obito <- dados_completo %>% 
+  group_by(city,date) %>% 
+  summarise(Óbitos=max(deaths),id=first(ibgeID)) %>% 
+  ungroup()
+dados_caso <- dados_completo %>% 
+  group_by(city,date) %>% 
+  summarise(Casos=max(totalCases),id=first(ibgeID)) %>% 
+  ungroup()
 ```
 
 
@@ -260,7 +267,7 @@ renderPlotly({
       g2 <- ggplot(data=dados,
                    aes(x=date,y=deaths,color=localidade))+
         geom_line(size=2,alpha=0.6)+
-        geom_point(cex=4,alpha=0.6)+
+        #geom_point(cex=4,alpha=0.6)+
         theme(axis.text.x = element_text(size=18),
               legend.title=element_blank())+
         xlab("Dia")+
@@ -274,7 +281,7 @@ renderPlotly({
       g2 <- ggplot(data=dados,
                    aes(x=date,y=totalCases,color=localidade))+
         geom_line(size=2,alpha=0.6)+
-        geom_point(cex=4,alpha=0.6)+
+        #geom_point(cex=4,alpha=0.6)+
         theme(axis.text.x = element_text(size=18),
               legend.title=element_blank())+
         xlab("Dia")+
@@ -350,7 +357,7 @@ renderPlotly({
       g2 <- ggplot(data=dados,
                    aes(x=dia_padronizado,y=deaths,color=localidade))+
         geom_line(size=2,alpha=0.6)+
-        geom_point(cex=4,alpha=0.6)+
+        #geom_point(cex=4,alpha=0.6)+
         theme(axis.text.x = element_text(size=18),
               legend.title=element_blank())+
         xlab("Dias desde o 15º óbito")+
@@ -363,7 +370,7 @@ renderPlotly({
                    aes(x=dia_padronizado,y=totalCases,
                        color=localidade))+
         geom_line(size=2,alpha=0.6)+
-        geom_point(cex=4,alpha=0.6)+
+        #geom_point(cex=4,alpha=0.6)+
         theme(axis.text.x = element_text(size=18),
               legend.title=element_blank())+
         xlab("Dias desde o 15º óbito")+
@@ -408,11 +415,11 @@ renderPlotly({
     if(input$estat=="Óbitos")
     {
       
- 
+      
       g1 <- ggplot(data=dados,
                    aes(x=date,y=newDeaths,color=localidade))+
         geom_line(size=2,alpha=0.6)+
-        geom_point(cex=4,alpha=0.6)+
+        #geom_point(cex=4,alpha=0.6)+
         theme(axis.text.x = element_text(size=18),
               legend.title=element_blank())+
         xlab("Dia")+
@@ -424,7 +431,7 @@ renderPlotly({
       g1 <- ggplot(data=dados,
                    aes(x=date,y=newCases,color=localidade))+
         geom_line(size=2,alpha=0.6)+
-        geom_point(cex=4,alpha=0.6)+
+        #geom_point(cex=4,alpha=0.6)+
         theme(axis.text.x = element_text(size=18),
               legend.title=element_blank())+
         xlab("Dia")+
@@ -497,7 +504,7 @@ renderPlotly({
       g1 <- ggplot(data=dados,
                    aes(x=date,y=newDeaths,color=localidade))+
         geom_line(size=2,alpha=0.6)+
-        geom_point(cex=4,alpha=0.6)+
+        #geom_point(cex=4,alpha=0.6)+
         theme(axis.text.x = element_text(size=18),
               legend.title=element_blank())+
         xlab("Dia")+
@@ -510,7 +517,7 @@ renderPlotly({
       g1 <- ggplot(data=dados,
                    aes(x=date,y=newCases,color=localidade))+
         geom_line(size=2,alpha=0.6)+
-        geom_point(cex=4,alpha=0.6)+
+        #geom_point(cex=4,alpha=0.6)+
         theme(axis.text.x = element_text(size=18),
               legend.title=element_blank())+
         xlab("Dia")+
@@ -611,6 +618,19 @@ renderPlotly({
       ungroup()
   }
   
+  length_series <- dados %>% 
+    group_by(localidade) %>%
+    summarise(n=n()) %>% 
+    filter(n>=7)
+  
+  dados <- dados %>% 
+    group_by(localidade) %>%
+    filter(localidade%in%length_series$localidade) %>% 
+    group_modify(~data.frame(dia_padronizado=.x$dia_padronizado,
+                             deaths=as.vector(forecast::ma(.x$deaths,order = 7)),
+                             totalCases=as.vector(forecast::ma(.x$totalCases,order = 7)))) %>% 
+    ungroup()
+  
   d <- highlight_key(dados, ~localidade)
   if(input$estat_comp=="Óbitos")
   {
@@ -624,9 +644,11 @@ renderPlotly({
                 size=1,alpha=0.8)+
       theme(axis.text.x = element_text(size=18),
             legend.title=element_blank())+
-      xlab("Dias desde o 8º óbito")+
+      xlab("Dias desde o 15º óbito")+
       ylab("Óbitos (acumulado)")+
-      expand_limits(y = 0)
+      expand_limits(y = 0)+
+      ggtitle("Média móveis (7 dias)")+
+      theme(plot.title=element_text(size=14,face="plain"))
     
   } else {
     
@@ -639,9 +661,12 @@ renderPlotly({
                 size=1,alpha=0.8)+
       theme(axis.text.x = element_text(size=18),
             legend.title=element_blank())+
-      xlab("Dias desde o 8º óbito")+
+      xlab("Dias desde o 15º óbito")+
       ylab("Casos (acumulado)")+
-      expand_limits(y = 0)
+      expand_limits(y = 0)+
+      ggtitle("Média móveis (7 dias)")+
+      theme(plot.title=element_text(size=14,face="plain"))
+    
     
   }
   
@@ -650,7 +675,6 @@ renderPlotly({
   {
     g2 <- g2+scale_y_log10()
   }
-  
   
   ggplotly(g2,tooltip = "localidade")  %>% 
     highlight(on = "plotly_hover", off ="plotly_deselect",color=c("grey21"),debounce=5)
@@ -680,6 +704,21 @@ renderPlotly({
       ungroup()
   }
   
+  
+  length_series <- dados %>% 
+    group_by(localidade) %>%
+    summarise(n=n()) %>% 
+    filter(n>=7)
+  
+  dados <- dados %>% 
+    group_by(localidade) %>%
+    filter(localidade%in%length_series$localidade) %>% 
+    group_modify(~data.frame(dia_padronizado=.x$dia_padronizado,
+                             newDeaths=as.vector(forecast::ma(.x$newDeaths,order = 7)),
+                             newCases=as.vector(forecast::ma(.x$newCases,order = 7)))) %>% 
+    ungroup()
+  
+  
   d <- highlight_key(dados, ~localidade)
   if(input$estat_comp=="Óbitos")
   {
@@ -693,23 +732,29 @@ renderPlotly({
                 size=1,alpha=0.8)+
       theme(axis.text.x = element_text(size=18),
             legend.title=element_blank())+
-      xlab("Dias desde o 8º óbito")+
+      xlab("Dias desde o 15º óbito")+
       ylab("Novos Óbitos")+
-      expand_limits(y = 0)
+      expand_limits(y = 0)+
+      ggtitle("Média móveis (7 dias)")+
+      theme(plot.title=element_text(size=14,face="plain"))
+    
     
   } else {
     g1 <- ggplot(data=d,
                  aes(x=dia_padronizado,y=newCases,group=localidade))+
       geom_line(size=0.6,alpha=0.6,color="grey71")+
-    geom_line(data=dados %>%
-                filter(localidade%in%lista_localidade),
-              aes(x=dia_padronizado,y=newCases,color=localidade),
-              size=1,alpha=0.8)+
+      geom_line(data=dados %>%
+                  filter(localidade%in%lista_localidade),
+                aes(x=dia_padronizado,y=newCases,color=localidade),
+                size=1,alpha=0.8)+
       theme(axis.text.x = element_text(size=18),
             legend.title=element_blank())+
-      xlab("Dias desde o 8º óbito")+
+      xlab("Dias desde o 15º óbito")+
       ylab("Novos Casos")+
-      expand_limits(y = 0)
+      expand_limits(y = 0)+
+      ggtitle("Média móveis (7 dias)")+
+      theme(plot.title=element_text(size=14,face="plain"))
+    
     
     
   }
@@ -810,7 +855,7 @@ output$plot_variacao = renderPlotly({
 plotlyOutput('plot_variacao', width = "100%",height = 30*length(unique(dados_cidade$city)))
 ```
 
-Mapa de espalhamento
+Mapa de aumento
 ====================================================================
 
 
@@ -873,13 +918,13 @@ output$mymap = renderLeaflet({
       group_by(city) %>% 
       summarise(Óbitos=max(deaths),id=first(ibgeID))
     
-    dados_mapa <- brazilmaps::get_brmap("City") %>% 
+    dados_mapa <- mapa_brasil %>% 
       left_join(codigos, by = c("State" = "codigo")) %>%
       left_join(dados_obito, by = c("City" = "id")) %>% 
       left_join(casos_ultimos_dias_local, by = c("City" = "ibgeID")) %>%
       filter(sigla == input$state_map) %>% 
       mutate(Crescimento = round(100*Aumento, 1)) 
-
+    
     dados_mapa$nome <- str_to_title(dados_mapa$nome)
     
     greens <- colorBin("Greens",
@@ -896,7 +941,7 @@ output$mymap = renderLeaflet({
                     opacity = 1.0),
                   label=~htmlEscape(paste0(nome, 
                                            " ", 
-                                           round(100*Aumento,1),"% ","Óbitos: ",Óbitos)),
+                                           round(100*Aumento,1),"% ","Total óbitos: ",Óbitos)),
                   labelOptions = labelOptions(direction = "bottom",
                                               style = list(
                                                 "font-family" = "serif",
@@ -921,7 +966,7 @@ output$mymap = renderLeaflet({
         filter(Aumento!=Inf)
     }
     
-   
+    
     dados_mapa <- brazilmaps::get_brmap("State") %>% 
       left_join(codigos, by = c("State" = "codigo")) %>% 
       left_join(casos_ultimos_dias_local, by = c("sigla" = "state")) %>%
@@ -941,7 +986,7 @@ output$mymap = renderLeaflet({
                     opacity = 1.0),
                   label=~htmlEscape(paste0(sigla, 
                                            " ", 
-                                           round(100*Aumento,1),"% ","Óbitos: ",Óbitos)),
+                                           round(100*Aumento,1),"% ","Total óbitos: ",Óbitos)),
                   labelOptions = labelOptions(direction = "bottom",
                                               style = list(
                                                 "font-family" = "serif",
@@ -951,13 +996,112 @@ output$mymap = renderLeaflet({
                                               ))) %>%
       addLegend("bottomright",title="Aumento em</br> em 7 dias", pal = greens, values = ~Aumento,
                 opacity = 1) 
-     
+    
   }
   
 })
 leafletOutput('mymap', width = "100%", height = "100%")
 ```
 
+Total de óbitos por localidade
+====================================================================
+
+
+Inputs {.sidebar}
+----------------------------------
+
+
+```{r}
+radioButtons("local_obitos",label =strong("Local"),
+             choices = c("País","Estado"),
+             selected = "País")
+conditionalPanel(
+  condition = "input.local_obitos == 'Estado'",
+  selectInput("state_obitos", strong("Estado:"), 
+              sort(unique(dados_estados$state)),
+              selected = c("SP"), 
+              multiple = FALSE, selectize = TRUE),
+  sliderInput("data_escolhida_estado",label=strong("Dia"),
+              min=min(dados_completo$date),
+              max=max(dados_completo$date)-1,
+              value=max(dados_completo$date)-1,
+              timeFormat="%d/%m",step = 3,
+              animate = animationOptions(interval=1000))
+)
+conditionalPanel(
+  condition = "input.local_obitos == 'País'",
+  sliderInput("data_escolhida_pais",label=strong("Dia"),
+              min=min(dados_completo$date),
+              max=max(dados_completo$date)-1,
+              value=max(dados_completo$date)-1,
+              timeFormat="%d/%m",
+              animate = FALSE)
+)
+```
+
+
+### 
+
+**Última atualização** do banco de dados: `r ultima_atualizacao`.
+Dados do último dia de atualização podem ainda estar incompletos.
+
+
+Row 
+-----------------------------------------------------------------------
+
+```{r}
+output$plot_obitos = renderPlot({
+  
+  if(input$local_obitos=="Estado")
+  {
+    data_escolhida <- input$data_escolhida_estado
+  } else {
+    data_escolhida <- input$data_escolhida_pais
+  }
+  
+  dados_mapa2 <- mapa_brasil %>% 
+    select(City,geometry,State) %>% 
+    mutate(data=data_escolhida,state=State) %>% 
+    left_join(dados_obito %>% 
+                filter(date==data_escolhida), 
+              by = c("City" = "id")) %>% 
+    left_join(codigos, by = c("State" = "codigo"))
+  
+  dados_mapa2$Óbitos[is.na(dados_mapa2$Óbitos)] <- 0
+  
+  
+  if(input$local_obitos=="Estado")
+  {
+    dados_mapa2 <- dados_mapa2 %>% 
+      filter(sigla%in%input$state_obitos)
+  }
+  
+  g <- ggplot()+
+    geom_sf(data=dados_mapa2,
+            aes(fill=Óbitos),lwd=0)+
+    scale_fill_viridis(option = "magma",trans="pseudo_log",
+                         limits=c(0,max(dados_obito$Óbitos)),breaks=round(exp(seq(log(1),log(max(dados_obito$Óbitos)),length.out = 4))),
+                         guide = guide_colorbar(
+                           direction = "horizontal",
+                           barheight = unit(2, units = "mm"),
+                           barwidth = unit(50, units = "mm"),
+                           draw.ulim = F,
+                           title.position = 'top',
+                           # some shifting around
+                           title.hjust = 0.5,
+                           label.hjust = 0.5
+                         ))+
+    ggthemes::theme_map()+
+    theme(legend.position="top",
+          legend.title=element_text(size=18),
+          legend.text = element_text(size=14))
+  g
+  
+  
+  
+})
+plotOutput('plot_obitos', width = "100%",height = "100%")
+```
 
 Explicações
 ====================================================================
