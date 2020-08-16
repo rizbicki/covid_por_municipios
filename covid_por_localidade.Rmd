@@ -2,8 +2,9 @@
 title: "Evolução da Covid-19 no Brasil"
 output: 
   flexdashboard::flex_dashboard:
-    orientation: rows
+    orientation: columns
     vertical_layout: fill
+    theme: cerulean
     logo: small48.png
     favicon: small48.png
     navbar:
@@ -185,14 +186,14 @@ dados_caso <- dados_completo %>%
 
 
 
-Gráficos temporais
+Gráficos Temporais {data-navmenu="Escolha um relatório"}
 =======================================================================
 
 Inputs {.sidebar}
 ----------------------------------
 
-
 ```{r}
+
 radioButtons("escala",label = strong("Escala"),
              choices = c("Linear","Logarítmica"),
              selected = "Logarítmica")
@@ -227,14 +228,12 @@ conditionalPanel(
 ```
 
 
-
 ### 
 
 **Última atualização** do banco de dados: `r ultima_atualizacao`.
 Dados do último dia de atualização podem ainda estar incompletos.
 
-
-Row {data-height=2000 .tabset .tabset-fade}
+Column {.tabset .tabset-fade}
 -----------------------------------------------------------------------
 
 
@@ -544,7 +543,7 @@ renderPlotly({
 
 
 
-Comparação de localidades
+Comparação de localidades {data-navmenu="Escolha um relatório"}
 =======================================================================
 
 Inputs {.sidebar}
@@ -592,13 +591,11 @@ Dados do último dia de atualização podem ainda estar incompletos.
 Escolha os municípios/estados que deseja comparar no gráfico.
 
 
-Row {data-height=2000 .tabset .tabset-fade}
+Column {.tabset .tabset-fade}
 -----------------------------------------------------------------------
 
 
 ### Acumulado
-
-
 
 ```{r}
 renderPlotly({
@@ -772,9 +769,7 @@ renderPlotly({
 })
 ```
 
-
-
-Variação de novos casos
+Variação de novos casos {data-navmenu="Escolha um relatório"}
 ====================================================================
 
 
@@ -794,7 +789,7 @@ radioButtons("estat_variacao",label =strong("Estatística"),
 Dados do último dia de atualização podem ainda estar incompletos.
 
 
-Column { 
+Column
 -----------------------------------------------------------------------
 
 ```{r}
@@ -823,7 +818,8 @@ output$plot_variacao = renderPlotly({
       scale_y_continuous(labels = scales::percent)+
       coord_flip()+
       ylab("Aumento percentual de óbitos nos últimos 7 dias (apenas cidades com mais de 15 óbitos)")+
-      xlab("")
+      xlab("")+
+      theme(axis.text.y=element_blank(), axis.ticks.y=element_blank())
     
   } else {
     
@@ -848,14 +844,14 @@ output$plot_variacao = renderPlotly({
       scale_y_continuous(labels = scales::percent)+
       coord_flip()+
       ylab("Aumento percentual de casos nos últimos 7 dias (apenas cidades com mais de 15 óbitos)")+
-      xlab("")
-    
+      xlab("")+
+      theme(axis.text.y=element_blank(), axis.ticks.y=element_blank())
   }
 })
-plotlyOutput('plot_variacao', width = "100%",height = 30*length(unique(dados_cidade$city)))
+plotlyOutput('plot_variacao', width = "100%", height = 30*length(unique(dados_cidade$city)))
 ```
 
-Mapa de aumento
+Mapa de aumento {data-navmenu="Escolha um relatório"}
 ====================================================================
 
 
@@ -891,7 +887,7 @@ e não o número de casos.
 Dados do último dia de atualização podem ainda estar incompletos.
 
 
-Row 
+Column
 -----------------------------------------------------------------------
 
 ```{r}
@@ -1003,7 +999,7 @@ output$mymap = renderLeaflet({
 leafletOutput('mymap', width = "100%", height = "100%")
 ```
 
-Total de óbitos por localidade
+Total de óbitos por localidade {data-navmenu="Escolha um relatório"}
 ====================================================================
 
 
@@ -1046,7 +1042,7 @@ conditionalPanel(
 Dados do último dia de atualização podem ainda estar incompletos.
 
 
-Row 
+Column
 -----------------------------------------------------------------------
 
 ```{r}
@@ -1103,13 +1099,14 @@ output$plot_obitos = renderPlot({
 plotOutput('plot_obitos', width = "100%",height = "100%")
 ```
 
-Explicações
+Explicações {data-navmenu="Escolha um relatório"}
 ====================================================================
 
-Row
+Column
 -----------------------------------------------------------------------
 
-### 
+###
+
 
 A finalidade deste aplicativo é dar insights sobre a dinâmica da evolução do novo coronavírus no Brasil. 
 Os dados utilizados  elabordar os gráficos 
