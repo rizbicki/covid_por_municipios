@@ -48,30 +48,24 @@ library(leaflet)
 library(htmltools)
 library(leafem)
 library(viridis)
-#theme_set(theme_bw(base_size = 20))
-theme_set(ft_theme(base_size = 20))
-no_axis <- theme(axis.title=element_blank(),
-                 axis.text=element_blank(),
-                 axis.ticks=element_blank(),
-                 panel.grid.major = element_blank(),
-                 panel.grid.minor = element_blank())
+
 n_min_obitos <- 8
 leitura_tempo_real <- TRUE
 
-if(leitura_tempo_real)
-{
+if (leitura_tempo_real) {
   dados <- try(read_csv("https://raw.githubusercontent.com/wcota/covid19br/master/cases-brazil-cities-time.csv"),silent = TRUE)
-  if(class(dados)=="try-error")
-  {
+  if (class(dados)=="try-error") {
     dados <- read_csv("cases-brazil-cities-time.csv")
   }
 } else {
   dados <- read_csv("cases-brazil-cities-time.csv")
 }
 
+sem_loc <- dados$city[grep(pattern = "LOCAL",dados$city)]
 
-#dados <- dados %>% 
-#  filter(date<="2020-05-02")
+dados <- dados %>% 
+  arrange(date) %>% 
+  filter(date>"2020-03-15",!(city%in%sem_loc))
 
 dados_estados <- dados %>% 
   group_by(date,state) %>% 
@@ -80,35 +74,11 @@ dados_estados <- dados %>%
             newCases=sum(newCases),
             totalCases=sum(totalCases))
 
-sem_loc <- dados$city[grep(pattern = "LOCAL",dados$city)]
-
-dados <- dados %>% 
-  arrange(date) %>% 
-  filter(date>"2020-03-15",city!="TOTAL",
-         !(city%in%sem_loc))
-
-dados_estados <- dados_estados %>% 
-  arrange(date) %>% 
-  filter(date>"2020-03-15",state!="TOTAL")
-
-dados_padronizado_cidade <- dados %>% 
-  filter(deaths>=15) %>% 
-  group_by(city) %>% 
-  mutate(dia_padronizado=row_number())
-
 dados_padronizado_estado <- dados_estados %>% 
   filter(deaths>=15) %>% 
   group_by(state) %>% 
-  mutate(dia_padronizado=row_number())
-
-dados_por_semana_cidade <- 
-  dados %>% 
-  mutate(semana=epiweek(date)) %>% 
-  group_by(semana,city) %>% 
-  summarise(newDeaths=sum(newDeaths),
-            newCases=sum(newCases),
-            deaths=max(deaths),
-            totalCases=max(totalCases))
+  mutate(dia_padronizado=row_number()) %>%
+  rename(localidade=state)
 
 dados_por_semana_estado <- 
   dados_estados %>% 
@@ -117,7 +87,24 @@ dados_por_semana_estado <-
   summarise(newDeaths=sum(newDeaths),
             newCases=sum(newCases),
             deaths=max(deaths),
-            totalCases=max(totalCases))
+            totalCases=max(totalCases)) %>%
+  rename(localidade=state)
+
+dados_padronizado_cidade <- dados %>% 
+  filter(deaths>=15) %>% 
+  group_by(city) %>% 
+  mutate(dia_padronizado=row_number()) %>%
+  rename(localidade=city)
+
+dados_por_semana_cidade <- 
+  dados %>% 
+  mutate(semana=epiweek(date)) %>% 
+  group_by(semana,city) %>% 
+  summarise(newDeaths=sum(newDeaths),
+            newCases=sum(newCases),
+            deaths=max(deaths),
+            totalCases=max(totalCases)) %>%
+  rename(localidade=city)
 
 total_casos <- dados %>% 
   group_by(city) %>% 
