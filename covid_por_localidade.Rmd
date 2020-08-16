@@ -196,7 +196,7 @@ Inputs {.sidebar}
 
 radioButtons("escala",label = strong("Escala"),
              choices = c("Linear","Logarítmica"),
-             selected = "Logarítmica")
+             selected = "Linear")
 radioButtons("estat",label =strong("Estatística"),
              choices = c("Casos","Óbitos"),
              selected = "Casos")
@@ -553,7 +553,7 @@ Inputs {.sidebar}
 ```{r}
 radioButtons("escala_comp",label = strong("Escala"),
              choices = c("Linear","Logarítmica"),
-             selected = "Logarítmica")
+             selected = "Linear")
 radioButtons("estat_comp",label =strong("Estatística"),
              choices = c("Casos","Óbitos"),
              selected = "Casos")
