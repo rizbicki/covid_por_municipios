@@ -475,6 +475,9 @@ Escolha os municípios/estados que deseja comparar no gráfico.
 Column {.tabset .tabset-fade}
 -----------------------------------------------------------------------
 
+```{r}
+h4('Comparação de localidades', align = "center")
+```
 
 ### Acumulado
 
@@ -673,7 +676,11 @@ Dados do último dia de atualização podem ainda estar incompletos.
 Column
 -----------------------------------------------------------------------
 
+###
+
 ```{r}
+h4('Variação de novos casos', align="center")
+
 output$plot_variacao = renderPlotly({
   
   if(input$estat_variacao=="Óbitos")
@@ -772,6 +779,8 @@ Column
 -----------------------------------------------------------------------
 
 ```{r}
+h4('Mapa de aumento', align = "center")
+
 output$mymap = renderLeaflet({
   
   if(input$local=="Estado")
@@ -926,7 +935,11 @@ Dados do último dia de atualização podem ainda estar incompletos.
 Column
 -----------------------------------------------------------------------
 
+###
+
 ```{r}
+h4('Total de óbitos por localidade', align = "center")
+
 output$plot_obitos = renderPlot({
   
   if(input$local_obitos=="Estado")
@@ -988,6 +1001,9 @@ Column
 
 ###
 
+```{r}
+h4('Explicações', align = "center")
+```
 
 A finalidade deste aplicativo é dar insights sobre a dinâmica da evolução do novo coronavírus no Brasil. 
 Os dados utilizados  elabordar os gráficos 
