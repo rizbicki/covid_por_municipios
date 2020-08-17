@@ -489,13 +489,11 @@ renderPlotly({
   {
     lista_localidade <- input$state_comp
     dados <- dados_padronizado_estado  %>% 
-      mutate(localidade=state) %>% 
       ungroup()
     
   } else {
     lista_localidade <- input$cidade_comp
     dados <- dados_padronizado_cidade  %>% 
-      mutate(localidade=city) %>% 
       ungroup()
   }
   
@@ -576,12 +574,10 @@ renderPlotly({
   {
     lista_localidade <- input$state_comp
     dados <- dados_padronizado_estado  %>% 
-      mutate(localidade=state) %>% 
       ungroup()
   } else {
     lista_localidade <- input$cidade_comp
     dados <- dados_padronizado_cidade  %>% 
-      mutate(localidade=city) %>% 
       ungroup()
   }
   
