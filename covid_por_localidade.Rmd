@@ -40,6 +40,11 @@ library(patchwork)
 library(knitr)
 library(kableExtra)
 library(ftplottools)
+library(dygraphs)
+library(xts)
+library(tbl2xts)
+library(RColorBrewer)
+library(reshape2)
 library(plotly)
 #library(geobr)
 library(brazilmaps)
@@ -168,9 +173,10 @@ dados_caso <- dados_completo %>%
   group_by(city,date) %>% 
   summarise(Casos=max(totalCases),id=first(ibgeID)) %>% 
   ungroup()
+
+reactive_values <- reactiveValues(graph_title="")
+
 ```
-
-
 
 
 Gráficos Temporais {data-navmenu="Escolha um relatório"}
@@ -223,309 +229,153 @@ Dados do último dia de atualização podem ainda estar incompletos.
 Column {.tabset .tabset-fade}
 -----------------------------------------------------------------------
 
+```{r}
+dygraph_fx <- function(data, x_label, y_label, main, type="timeseries", markers=FALSE) {
+  d <- dygraph(data, xlab=x_label, ylab=y_label, main=main) %>%
+      dyRangeSelector() %>%
+      dyHighlight(highlightCircleSize = 4, 
+      highlightSeriesBackgroundAlpha = 0.8,
+      highlightSeriesOpts = list(strokeWidth = 4)) %>%
+      dyLegend(show = "follow")
+  if (markers) {
+    d <- d %>% dyOptions(maxNumberWidth = 20, colors = RColorBrewer::brewer.pal(8, "Set2"), strokeWidth = 3, drawPoints = TRUE, pointSize = 4)
+  }
+  else {
+    d <- d %>% dyOptions(maxNumberWidth = 20, colors = RColorBrewer::brewer.pal(8, "Set2"), strokeWidth = 3)
+  }
+  if (type=="timeseries") {
+    d <- d %>% dyAxis("x", axisLabelFormatter = 'function(d) { return moment(d).format("DD/MMM");}', valueFormatter = 'function(ms) { return moment(ms).format("DD[ de ]MMMM[ de ]YYYY"); }')
+  }
+  else {
+    d <- d %>% dyAxis("x", axisLabelFormatter = 'function(d) { return d;}', valueFormatter = 'function(d) { return "Semana " + d; }')
+  }
+  d <- d %>% dyAxis("y", axisLabelFormatter = 'function(d) { return new Number(d).toLocaleString("pt-br"); }', valueFormatter = 'function(d) { return new Number(d).toLocaleString("pt-br"); }', logscale = input$escala=="Logarítmica")
+  return(d)
+}
+
+render_grafico_temporal_fx <- function(flag_acumulado = FALSE) {
+  renderDygraph({
+    if (input$estat=="Óbitos") {
+      reactive_values$graph_title <- paste0("Total no Brasil no período: " , format(dados_total$deaths, big.mark=".", decimal.mark=","))
+    } else {
+      reactive_values$graph_title <- paste0("Total no Brasil no período: " , format(dados_total$totalCases, big.mark=".", decimal.mark=","))
+    }
+    if (input$estat=="Óbitos") {
+      if (flag_acumulado) {
+        col = "deaths"
+        col_desc = "Óbitos (acumulado)"
+      }
+      else {
+        col = "newDeaths"
+        col_desc = "Novos Óbitos"
+      }
+    }
+    else {
+      if (flag_acumulado) {
+        col = "totalCases"
+        col_desc = "Casos (acumulado)"
+      }
+      else {
+        col = "newCases"
+        col_desc = "Novos Casos"
+      }
+    }
+
+    if (input$eixo_x=="Diário") {
+      if (input$localidade == 'Estados') {
+        dados_diarios <- dados_estados  %>% 
+          filter(state %in% input$state) %>% 
+          rename(localidade=state)
+      } else {
+        dados_diarios <- dados_cidade  %>%
+          filter(city %in% input$cidade)%>% 
+          rename(localidade=city)
+      }
+
+      if (input$estat=="Óbitos") {
+        xtsdata <- tbl_xts(tbl_df(dados_diarios), cols_to_xts = col, spread_by = "localidade")
+        g2 <- dygraph_fx(xtsdata, x_label='Dia', y_label = col_desc, main=main)
+      } else {
+        xtsdata <- tbl_xts(tbl_df(dados_diarios), cols_to_xts = col, spread_by = "localidade")
+        g2 <- dygraph_fx(xtsdata, x_label='Dia', y_label = col_desc, main=main)
+      }
+    }
+    
+    if(input$eixo_x=="Semanal") {
+      if(input$estat=="Óbitos") {
+        if(input$localidade == 'Estados') {
+          data <- dados_por_semana_estado %>% filter(localidade %in%  input$state)
+        }
+        else {
+          data <- dados_por_semana_cidade %>% filter(localidade %in% input$cidade)
+        }
+        y_label <- col_desc
+      }
+      else {
+        if(input$localidade == 'Estados') {
+          data <- dados_por_semana_estado %>% filter(localidade %in%  input$state)
+        }
+        else {
+          data <- dados_por_semana_cidade %>% filter(localidade %in% input$cidade)
+        }
+        y_label <- col_desc
+      }
+      series_dados <- dcast(data = data, formula = semana ~ localidade, value.var = col)
+      g2 <- dygraph_fx(series_dados, x_label='Semana epidemiológica', y_label=y_label, main=main, type="number", markers=TRUE)
+    }
+    
+    if(input$eixo_x=="Diário Normalizado") {
+      if(input$estat=="Óbitos") {
+        if(input$localidade == 'Estados') {
+          data <- dados_padronizado_estado %>% filter(localidade %in%  input$state)
+        }
+        else {
+          data <- dados_padronizado_cidade %>% filter(localidade %in% input$cidade)
+        }
+        y_label <- col_desc
+    
+      }
+      else {
+        if(input$localidade == 'Estados') {
+          data <- dados_padronizado_estado %>% filter(localidade %in%  input$state)
+        }
+        else {
+          data <- dados_padronizado_cidade %>% filter(localidade %in% input$cidade)
+        }
+        y_label <- col_desc
+      }
+      series_dados <- dcast(data = data, formula = dia_padronizado ~ localidade, value.var = col)
+      g2 <- dygraph_fx(series_dados, x_label='Dias desde o 15º óbito', y_label=y_label, main=main, type="number")
+    }
+    g2
+  })
+}
+
+renderUI({
+        h4(reactive_values$graph_title, align = "center")
+})
+
+main = "Gráfico Temporal"
+# Dados totais Brasil
+dados_total <- dados  %>% 
+  filter(city=='TOTAL') %>%
+  group_by(city) %>%
+  summarise(newDeaths=sum(newDeaths),
+    newCases=sum(newCases),
+    deaths=max(deaths),
+    totalCases=max(totalCases))
+```
 
 ### Acumulado
 
-
-
 ```{r}
-renderPlotly({
-  
-  if(input$eixo_x=="Diário")
-  {
-    
-    if(input$localidade == 'Estados')
-    {
-      dados <- dados_estados  %>% 
-        filter(state%in%input$state) %>% 
-        rename(localidade=state)
-    } else {
-      dados <- dados_cidade  %>% 
-        filter(city%in%input$cidade)%>% 
-        rename(localidade=city)
-    }
-    
-    
-    if(input$estat=="Óbitos")
-    {
-      
-      
-      g2 <- ggplot(data=dados,
-                   aes(x=date,y=deaths,color=localidade))+
-        geom_line(size=2,alpha=0.6)+
-        #geom_point(cex=4,alpha=0.6)+
-        theme(axis.text.x = element_text(size=18),
-              legend.title=element_blank())+
-        xlab("Dia")+
-        ylab("Óbitos (acumulado)")+
-        scale_x_date(labels = date_format("%d/%m"))+
-        expand_limits(y = 0)
-      
-      
-    } else {
-      
-      g2 <- ggplot(data=dados,
-                   aes(x=date,y=totalCases,color=localidade))+
-        geom_line(size=2,alpha=0.6)+
-        #geom_point(cex=4,alpha=0.6)+
-        theme(axis.text.x = element_text(size=18),
-              legend.title=element_blank())+
-        xlab("Dia")+
-        ylab("Casos (acumulado)")+
-        scale_x_date(labels = date_format("%d/%m"))+
-        expand_limits(y = 0)
-      
-    }
-    
-  }
-  
-  if(input$eixo_x=="Semanal")
-  {
-    if(input$localidade == 'Estados')
-    {
-      dados <- dados_por_semana_estado  %>% 
-        filter(state%in%input$state) %>% 
-        rename(localidade=state)
-    } else {
-      dados <- dados_por_semana_cidade  %>% 
-        filter(city%in%input$cidade)%>% 
-        rename(localidade=city)
-    }
-    
-    
-    if(input$estat=="Óbitos")
-    {
-      g2 <- ggplot(data=dados,
-                   aes(x=semana,y=deaths,color=localidade))+
-        geom_line(size=2,alpha=0.6)+
-        geom_point(cex=4,alpha=0.6)+
-        theme(axis.text.x = element_text(size=18),
-              legend.title=element_blank())+
-        xlab("Semana epidemiológica")+
-        ylab("Óbitos (acumulado)")+
-        expand_limits(y = 0)
-      
-    } else {
-      
-      g2 <- ggplot(data=dados,
-                   aes(x=semana,y=totalCases,color=localidade))+
-        geom_line(size=2,alpha=0.6)+
-        geom_point(cex=4,alpha=0.6)+
-        theme(axis.text.x = element_text(size=18),
-              legend.title=element_blank())+
-        xlab("Semana epidemiológica")+
-        ylab("Casos (acumulado)")+
-        expand_limits(y = 0)
-    }
-    
-    
-    
-  }
-  
-  
-  if(input$eixo_x=="Diário Normalizado")
-  {
-    if(input$localidade == 'Estados')
-    {
-      dados <- dados_padronizado_estado  %>% 
-        filter(state%in%input$state) %>% 
-        rename(localidade=state)
-    } else {
-      dados <- dados_padronizado_cidade  %>% 
-        filter(city%in%input$cidade)%>% 
-        rename(localidade=city)
-    }
-    
-    if(input$estat=="Óbitos")
-    {
-      
-      
-      g2 <- ggplot(data=dados,
-                   aes(x=dia_padronizado,y=deaths,color=localidade))+
-        geom_line(size=2,alpha=0.6)+
-        #geom_point(cex=4,alpha=0.6)+
-        theme(axis.text.x = element_text(size=18),
-              legend.title=element_blank())+
-        xlab("Dias desde o 15º óbito")+
-        ylab("Óbitos (acumulado)")+
-        expand_limits(y = 0)
-      
-    } else {
-      
-      g2 <- ggplot(data=dados,
-                   aes(x=dia_padronizado,y=totalCases,
-                       color=localidade))+
-        geom_line(size=2,alpha=0.6)+
-        #geom_point(cex=4,alpha=0.6)+
-        theme(axis.text.x = element_text(size=18),
-              legend.title=element_blank())+
-        xlab("Dias desde o 15º óbito")+
-        ylab("Casos (acumulado)")+
-        expand_limits(y = 0)
-    }
-    
-    
-  }
-  
-  
-  if(input$escala=="Logarítmica")
-  {
-    g2 <- g2+scale_y_log10()
-  }
-  
-  g2
-})
+render_grafico_temporal_fx(flag_acumulado = TRUE)
 ```
-
-
 
 ### Não-acumulado
 
-
 ```{r}
-renderPlotly({
-  
-  if(input$eixo_x=="Diário")
-  {
-    if(input$localidade == 'Estados')
-    {
-      dados <- dados_estados  %>% 
-        filter(state%in%input$state) %>% 
-        rename(localidade=state)
-    } else {
-      dados <- dados_cidade  %>% 
-        filter(city%in%input$cidade)%>% 
-        rename(localidade=city)
-    }
-    
-    if(input$estat=="Óbitos")
-    {
-      
-      
-      g1 <- ggplot(data=dados,
-                   aes(x=date,y=newDeaths,color=localidade))+
-        geom_line(size=2,alpha=0.6)+
-        #geom_point(cex=4,alpha=0.6)+
-        theme(axis.text.x = element_text(size=18),
-              legend.title=element_blank())+
-        xlab("Dia")+
-        ylab("Novos Óbitos")+
-        scale_x_date(labels = date_format("%d/%m"))+
-        expand_limits(y = 0)
-      
-    } else {
-      g1 <- ggplot(data=dados,
-                   aes(x=date,y=newCases,color=localidade))+
-        geom_line(size=2,alpha=0.6)+
-        #geom_point(cex=4,alpha=0.6)+
-        theme(axis.text.x = element_text(size=18),
-              legend.title=element_blank())+
-        xlab("Dia")+
-        ylab("Novos Casos")+
-        scale_x_date(labels = date_format("%d/%m"))+
-        expand_limits(y = 0)
-      
-    }
-    
-  }
-  
-  if(input$eixo_x=="Semanal")
-  {
-    if(input$localidade == 'Estados')
-    {
-      dados <- dados_por_semana_estado  %>% 
-        filter(state%in%input$state) %>% 
-        rename(localidade=state)
-    } else {
-      dados <- dados_por_semana_cidade  %>% 
-        filter(city%in%input$cidade)%>% 
-        rename(localidade=city)
-    }
-    
-    if(input$estat=="Óbitos")
-    {
-      
-      g1 <- ggplot(data=dados,
-                   aes(x=semana,y=newDeaths,color=localidade))+
-        geom_line(size=2,alpha=0.6)+
-        geom_point(cex=4,alpha=0.6)+
-        theme(axis.text.x = element_text(size=18),
-              legend.title=element_blank())+
-        xlab("Semana epidemiológica")+
-        ylab("Novos Óbitos")+
-        expand_limits(y = 0)
-      
-    } else {
-      g1 <- ggplot(data=dados,
-                   aes(x=semana,y=newCases,color=localidade))+
-        geom_line(size=2,alpha=0.6)+
-        geom_point(cex=4,alpha=0.6)+
-        theme(axis.text.x = element_text(size=18),
-              legend.title=element_blank())+
-        xlab("Semana epidemiológica")+
-        ylab("Novos Casos")+
-        expand_limits(y = 0)
-      
-    }
-    
-  }
-  
-  if(input$eixo_x=="Diário Normalizado")
-  {
-    if(input$localidade == 'Estados')
-    {
-      dados <- dados_padronizado_estado  %>% 
-        filter(state%in%input$state) %>% 
-        rename(localidade=state)
-    } else {
-      dados <- dados_padronizado_cidade  %>% 
-        filter(city%in%input$cidade)%>% 
-        rename(localidade=city)
-    }
-    
-    
-    if(input$estat=="Óbitos")
-    {
-      
-      g1 <- ggplot(data=dados,
-                   aes(x=date,y=newDeaths,color=localidade))+
-        geom_line(size=2,alpha=0.6)+
-        #geom_point(cex=4,alpha=0.6)+
-        theme(axis.text.x = element_text(size=18),
-              legend.title=element_blank())+
-        xlab("Dia")+
-        ylab("Novos Óbitos")+
-        scale_x_date(labels = date_format("%d/%m"))+
-        expand_limits(y = 0)
-      
-      
-    } else {
-      g1 <- ggplot(data=dados,
-                   aes(x=date,y=newCases,color=localidade))+
-        geom_line(size=2,alpha=0.6)+
-        #geom_point(cex=4,alpha=0.6)+
-        theme(axis.text.x = element_text(size=18),
-              legend.title=element_blank())+
-        xlab("Dia")+
-        ylab("Novos Casos")+
-        scale_x_date(labels = date_format("%d/%m"))+
-        expand_limits(y = 0)
-      
-    }
-    
-    
-    
-  }
-  
-  
-  
-  if(input$escala=="Logarítmica")
-  {
-    g1 <- g1+scale_y_log10()
-  }
-  
-  g1
-})
+render_grafico_temporal_fx(flag_acumulado = FALSE)
 ```
 
 
