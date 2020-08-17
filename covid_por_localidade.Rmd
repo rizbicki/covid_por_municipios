@@ -1017,5 +1017,5 @@ Dados do último dia de atualização podem ainda estar incompletos.
 
 Para sugestões/críticas/erros, por favor me envie um email (que pode ser encontrado em [http://www.rizbicki.ufscar.br/](http://www.rizbicki.ufscar.br/)).
 
-Agradeço ao Tiago Mendonça e ao Julio Trecenti pela ajuda
+Agradeço ao Tiago Mendonça, Julio Trecenti e ao Nilo César Teixeira pela ajuda
 na construção desse aplicativo.
