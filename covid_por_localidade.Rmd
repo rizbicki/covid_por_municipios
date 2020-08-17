@@ -23,11 +23,55 @@ border-color:white;
 }
 .navbar-brand {
 color:white!important;
+}
 
+.dygraph-legend {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 5px;
+  border: 1px solid #888;
+  padding: 10px;
+  box-shadow: 1px 1px 1px #CCC;
+  transition: transform 0.25s;
+  width: 90px;
 }
 </style>  
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.27.0/locale/pt-br.min.js"></script>
+
 <script>
+$(document).ready(function() {
+  //Locale info
+  moment.locale('pt-br');
+  
+  /* Setting legend position */
+  document.querySelectorAll('.dygraph-legend').forEach(function (el) {
+    el.left = false;
+    el.right = true;
+  })
+
+  /* Changing legend except mobile */
+  if (document.documentElement.clientWidth > 425) {
+    $('.dygraphs.html-widget').on('mousemove', function (e) {
+      var _legend = this.querySelector('.dygraph-legend');
+      var _w = _legend.offsetWidth;
+      
+      
+      if (document.documentElement.clientWidth - e.pageX < _w && !_legend.left) {
+        _legend.style.transform = 'translateX(-115%)';
+        _legend.right = false;
+        _legend.left = true;
+      }
+      else if (document.documentElement.clientWidth - e.pageX >= _w && !_legend.right) {
+        _legend.style.transform = 'translateX(0)';
+        _legend.right = true;
+        _legend.left = false;
+      }
+    });
+  }
+});
+
 $('.navbar-logo').wrap('<a href="http://www.small.ufscar.br/">');
 </script>
 
